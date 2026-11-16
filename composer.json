@@ -1,0 +1,41 @@
+{
+    "name": "dakotajune/blueprint_models",
+    "description": "Richer Eloquent models for Laravel Blueprint: modern attributes, defaults, meaningful docblocks, a commented-out _schema() reference, custom base classes and traits.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.2",
+        "illuminate/filesystem": "^11.0|^12.0|^13.0",
+        "illuminate/support": "^11.0|^12.0|^13.0",
+        "laravel-shift/blueprint": "^2.10"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0|^10.0|^11.0",
+        "pestphp/pest": "^3.0|^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Dakotajune\\BlueprintModels\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Dakotajune\\BlueprintModels\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Dakotajune\\BlueprintModels\\BlueprintModelsServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
