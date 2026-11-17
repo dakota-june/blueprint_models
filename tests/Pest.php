@@ -14,12 +14,17 @@ uses(TestCase::class)->in('Feature', 'Unit');
  * Attributes are switched on unless a test says otherwise: whether they are the default depends on the Laravel the
  * tests happen to run on, and these tests are about what the generator writes.
  *
- * @param  array<string, mixed>  $config  overrides for `blueprint_models.*`
+ * Validation rules are switched off unless a test says otherwise (`['validation.enabled' => true]`). They are on in the
+ * shipped config, and would add a trait and a `$rules` property to every file the other tests look at; the tests
+ * about them are in ValidationRulesTest.
+ *
+ * @param  array<string, mixed>  $config  overrides for `blueprint_models.*`, dotted keys such as `schema.mode` included
  * @return array<string, string>
  */
 function models(string $yaml, array $config = []): array
 {
     config(['blueprint_models.attributes' => true]);
+    config(['blueprint_models.validation.enabled' => false]);
 
     foreach ($config as $key => $value) {
         config(["blueprint_models.{$key}" => $value]);
@@ -33,7 +38,13 @@ function models(string $yaml, array $config = []): array
     foreach ($generated['created'] ?? [] as $entry) {
         // Blueprint 2.10 lists plain paths, later releases ['Model', path].
         $path = is_array($entry) ? $entry[1] : $entry;
-        $files[basename($path, '.php')] = (string) file_get_contents(base_path($path));
+        $source = (string) file_get_contents(base_path($path));
+
+        // Generated files use PHP_EOL, which is \r\n on Windows; the tests below are written with \n. A test that
+        // plants a stub of its own on disk is about line endings, and gets the file as it was written.
+        $files[basename($path, '.php')] = is_file(base_path('stubs/blueprint/model.class.stub'))
+            ? $source
+            : str_replace("\r\n", "\n", $source);
     }
 
     return $files;

@@ -34,6 +34,31 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Validation rules
+    |--------------------------------------------------------------------------
+    | Reads the columns of each model and writes the basic rules they imply into `protected $rules`, and adds the
+    | validating trait that runs them when the model is saved (https://github.com/dwightwatson/validating):
+    |
+    |     composer require watson/validating
+    |
+    | enabled          : true by default. false writes neither the rules nor the trait.
+    | trait            : the trait that goes with `$rules`. A model that already lists a trait of the same short name
+    |                    (`use: ValidatingTrait`) does not get it a second time.
+    | guess_from_names : `email` / `*_email` columns also get `email`, `url` / `*_url` columns get `url`.
+    |
+    | What a column gets, in this order: `nullable` (a nullable column), `sometimes|required` (it has a default) or
+    | `required`; then its type (`string|max:60`, `integer`, `min:0` when unsigned, `numeric|decimal:0,2`, `boolean`,
+    | `date`, `json`, `uuid`, `in:a,b` for an enum, ...); then `unique:table,column` for a `unique` column and
+    | `exists:table,id` for a foreign key. Primary keys, timestamps and soft deletes get nothing.
+    */
+    'validation' => [
+        'enabled' => true,
+        'trait' => 'Watson\Validating\ValidatingTrait',
+        'guess_from_names' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | _schema() reference
     |--------------------------------------------------------------------------
     | The whole table definition, the same code Blueprint puts in the migration, kept inside the model for reference.
@@ -51,8 +76,8 @@ return [
     |--------------------------------------------------------------------------
     | Docblocks
     |--------------------------------------------------------------------------
-    | Class @property / @property-read lines, relationship @return generics, and docblocks for $attributes, casts()
-    | and _schema(), plus the `@use HasFactory<...>` line. true by default; null follows Blueprint's own
+    | Class @property / @property-read lines, relationship @return generics, and docblocks for $attributes, $rules,
+    | casts() and _schema(), plus the `@use HasFactory<...>` line. true by default; null follows Blueprint's own
     | `generate_phpdocs` setting instead (off unless you turned it on).
     */
     'docblocks' => true,

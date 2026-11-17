@@ -13,6 +13,9 @@
         "orchestra/testbench": "^9.0|^10.0|^11.0",
         "pestphp/pest": "^3.0|^4.0"
     },
+    "suggest": {
+        "watson/validating": "The trait the generated models use to run their inferred $rules when saved (validation.enabled, on by default)."
+    },
     "autoload": {
         "psr-4": {
             "Dakotajune\\BlueprintModels\\": "src/"

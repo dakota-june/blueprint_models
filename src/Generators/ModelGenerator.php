@@ -13,6 +13,7 @@ use Dakotajune\BlueprintModels\Support\DefaultValue;
 use Dakotajune\BlueprintModels\Support\DocTypes;
 use Dakotajune\BlueprintModels\Support\ModelOptions;
 use Dakotajune\BlueprintModels\Support\ModelOptionsRegistry;
+use Dakotajune\BlueprintModels\Support\RuleBuilder;
 use Dakotajune\BlueprintModels\Support\SchemaDefinitionBuilder;
 use Illuminate\Support\Str;
 
@@ -33,6 +34,8 @@ final class ModelGenerator extends BlueprintModelGenerator
     private const PIVOT = 'Illuminate\\Database\\Eloquent\\Relations\\Pivot';
 
     private const HAS_FACTORY = 'Illuminate\\Database\\Eloquent\\Factories\\HasFactory';
+
+    private const VALIDATING_TRAIT = 'Watson\\Validating\\ValidatingTrait';
 
     /** @var array<string, list<array{name: string, type: string, related: string, through: ?string}>> */
     private array $relations = [];
@@ -121,9 +124,10 @@ final class ModelGenerator extends BlueprintModelGenerator
     private function render(string $stub, Model $model): string
     {
         $options = app(ModelOptionsRegistry::class)->for($model->fullyQualifiedClassName());
+        $rules = $this->validationRules($model);
 
         $parent = $this->reference($model, $this->parentClass($model, $options));
-        $traits = array_map(fn (string $trait): string => $this->reference($model, $trait), $this->traitClasses($model, $options));
+        $traits = array_map(fn (string $trait): string => $this->reference($model, $trait), $this->traitClasses($model, $options, $rules));
         $interfaces = array_map(fn (string $interface): string => $this->reference($model, $interface), $this->interfaceClasses($model));
 
         $relationships = $this->relationshipMethods($model);
@@ -138,7 +142,7 @@ final class ModelGenerator extends BlueprintModelGenerator
         $extends = $parent . ($interfaces === [] ? '' : ' implements ' . implode(', ', $interfaces));
 
         $members = array_filter([
-            $this->propertiesBlock($model),
+            $this->propertiesBlock($model, $rules),
             $this->buildSchema($model),
             $relationships,
         ], fn (string $block): bool => trim($block) !== '');
@@ -174,9 +178,10 @@ final class ModelGenerator extends BlueprintModelGenerator
     }
 
     /**
+     * @param  array<string, string>  $rules  the model's inferred validation rules; the validating trait goes with them
      * @return list<string>
      */
-    private function traitClasses(Model $model, ModelOptions $options): array
+    private function traitClasses(Model $model, ModelOptions $options, array $rules = []): array
     {
         $traits = [self::HAS_FACTORY];
 
@@ -198,7 +203,21 @@ final class ModelGenerator extends BlueprintModelGenerator
 
         array_push($traits, ...$options->traits);
 
-        return array_values(array_unique(array_map(fn (string $trait): string => ltrim($trait, '\\'), $traits)));
+        $traits = array_values(array_unique(array_map(fn (string $trait): string => ltrim($trait, '\\'), $traits)));
+
+        if ($rules !== []) {
+            $validating = ltrim((string) config('blueprint_models.validation.trait', self::VALIDATING_TRAIT), '\\');
+            $short = Str::afterLast($validating, '\\');
+
+            // A draft that already says `use: ValidatingTrait` (from wherever) is left alone.
+            $present = array_filter($traits, fn (string $trait): bool => Str::afterLast($trait, '\\') === $short);
+
+            if ($present === []) {
+                $traits[] = $validating;
+            }
+        }
+
+        return $traits;
     }
 
     /**
@@ -355,7 +374,10 @@ final class ModelGenerator extends BlueprintModelGenerator
 
     // -- properties and methods ----------------------------------------------------------------------------------
 
-    private function propertiesBlock(Model $model): string
+    /**
+     * @param  array<string, string>  $rules  the inferred validation rules, empty when there are none or they are off
+     */
+    private function propertiesBlock(Model $model, array $rules = []): string
     {
         $blocks = [];
 
@@ -367,6 +389,10 @@ final class ModelGenerator extends BlueprintModelGenerator
 
         if ($defaults !== []) {
             $blocks[] = $this->defaultsProperty($defaults);
+        }
+
+        if ($rules !== []) {
+            $blocks[] = $this->rulesProperty($rules);
         }
 
         $casts = $this->castableColumns($model->columns());
@@ -443,6 +469,32 @@ final class ModelGenerator extends BlueprintModelGenerator
             : '';
 
         return $doc . '    protected $attributes = ' . AttributeRenderer::array($defaults, 4) . ';';
+    }
+
+    /**
+     * The rules the columns imply, as the `$rules` property a validating trait reads.
+     *
+     * @return array<string, string>
+     */
+    private function validationRules(Model $model): array
+    {
+        if (! config('blueprint_models.validation.enabled', true)) {
+            return [];
+        }
+
+        return RuleBuilder::forModel($model, $this->tree, (bool) config('blueprint_models.validation.guess_from_names', true));
+    }
+
+    /**
+     * @param  array<string, string>  $rules
+     */
+    private function rulesProperty(array $rules): string
+    {
+        $doc = $this->docblocks()
+            ? "    /**\n     * The validation rules, worked out from the columns of the table.\n     *\n     * @var array<string, string>\n     */\n"
+            : '';
+
+        return $doc . '    protected $rules = ' . AttributeRenderer::array(array_map(DefaultValue::quote(...), $rules), 4) . ';';
     }
 
     private function buildSchema(Model $model): string
